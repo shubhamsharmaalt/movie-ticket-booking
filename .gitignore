@@ -1,6 +1,7 @@
 target/
 .m2/
 .env
+.env.example
 .DS_Store
 .idea/
 *.iml
