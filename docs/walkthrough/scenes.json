@@ -1,0 +1,595 @@
+{
+  "title": "Movie Ticket Booking \u2014 Code Walkthrough",
+  "voice": "Samantha",
+  "words_per_minute": 185,
+  "scenes": [
+    {
+      "title": "One application, clear responsibilities",
+      "subtitle": "MovieTicketsApplication \u00b7 packages \u00b7 configuration",
+      "points": [
+        "Java 21 + Spring Boot",
+        "REST API \u00b7 single application",
+        "PostgreSQL through JDBC"
+      ],
+      "segments": [
+        {
+          "text": "This walkthrough follows the movie ticket booking API from REST controllers through business logic to database transactions.",
+          "kind": "architecture"
+        },
+        {
+          "text": "Controllers handle HTTP, services own rules, and repositories persist entities. Separate packages contain records, security, jobs, errors, and calculations.",
+          "kind": "architecture"
+        },
+        {
+          "text": "MovieTicketsApplication starts Spring Boot and scheduling. Environment variables supply database credentials, and Flyway manages the schema.",
+          "source": "src/main/java/com/example/movietickets/MovieTicketsApplication.java",
+          "ranges": [
+            [
+              7,
+              13
+            ]
+          ],
+          "highlights": [
+            8,
+            9,
+            11,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Security and the HTTP boundary",
+      "subtitle": "SecurityConfiguration.security \u00b7 BookingController",
+      "points": [
+        "Public catalog reads",
+        "ADMIN and CUSTOMER roles",
+        "Authenticated customer identity"
+      ],
+      "segments": [
+        {
+          "text": "SecurityConfiguration uses HTTP Basic with admin and customer roles. Catalog browsing is public, while management and booking routes require the correct role.",
+          "source": "src/main/java/com/example/movietickets/config/SecurityConfiguration.java",
+          "ranges": [
+            [
+              34,
+              45
+            ]
+          ],
+          "highlights": [
+            39,
+            40,
+            41,
+            43
+          ]
+        },
+        {
+          "text": "BookingController exposes hold, pay, and cancel. It validates the body and passes the authenticated username to BookingService for ownership checks.",
+          "source": "src/main/java/com/example/movietickets/controller/BookingController.java",
+          "ranges": [
+            [
+              31,
+              42
+            ]
+          ],
+          "highlights": [
+            33,
+            38,
+            42
+          ]
+        },
+        {
+          "text": "The get and history methods return the customer's own bookings. The inbox endpoint returns that customer's delivered notifications.",
+          "source": "src/main/java/com/example/movietickets/controller/BookingController.java",
+          "ranges": [
+            [
+              44,
+              57
+            ]
+          ],
+          "highlights": [
+            45,
+            50,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Validate inputs, explain errors",
+      "subtitle": "ApiModels \u00b7 ApiException \u00b7 ApiErrors",
+      "points": [
+        "Validated Java records",
+        "Consistent JSON errors",
+        "Clear conflict responses"
+      ],
+      "segments": [
+        {
+          "text": "ApiModels holds request and response records. Validation checks required fields, price precision, percentages, and seat-list size before business logic runs.",
+          "source": "src/main/java/com/example/movietickets/dto/ApiModels.java",
+          "ranges": [
+            [
+              43,
+              50
+            ]
+          ],
+          "highlights": [
+            45,
+            48,
+            50
+          ]
+        },
+        {
+          "text": "ApiException represents expected failures. ApiErrors maps invalid input to bad requests, and seat or database conflicts to conflict responses with useful messages.",
+          "source": "src/main/java/com/example/movietickets/error/ApiErrors.java",
+          "ranges": [
+            [
+              17,
+              28
+            ]
+          ],
+          "highlights": [
+            18,
+            23,
+            27
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Create the catalog and show inventory",
+      "subtitle": "CatalogController \u00b7 CatalogService.createShow / browseShows",
+      "points": [
+        "Cities / theaters / shows",
+        "Reject overlapping schedules",
+        "Snapshot seats for each show"
+      ],
+      "segments": [
+        {
+          "text": "CatalogController delegates catalog management to CatalogService, covering cities, theaters, seats, movies, shows, pricing, discounts, and refund policies.",
+          "source": "src/main/java/com/example/movietickets/controller/CatalogController.java",
+          "ranges": [
+            [
+              63,
+              73
+            ]
+          ],
+          "highlights": [
+            63,
+            64,
+            68,
+            69,
+            71,
+            72
+          ]
+        },
+        {
+          "text": "createShow locks the theater, validates the schedule, and creates a ShowSeat row for every seat. The lock also coordinates concurrent layout edits.",
+          "source": "src/main/java/com/example/movietickets/service/CatalogService.java",
+          "ranges": [
+            [
+              195,
+              205
+            ]
+          ],
+          "highlights": [
+            197,
+            198,
+            202,
+            203
+          ]
+        },
+        {
+          "text": "browseShows filters future shows by city and local date, with database pagination. Protected admin edits preserve the meaning of existing bookings.",
+          "source": "src/main/java/com/example/movietickets/service/CatalogService.java",
+          "ranges": [
+            [
+              239,
+              252
+            ]
+          ],
+          "highlights": [
+            239,
+            244,
+            248,
+            250
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Entities retain state; repositories lock it",
+      "subtitle": "Catalog entities \u00b7 Booking / BookingSeat \u00b7 ShowSeatRepository",
+      "points": [
+        "Inventory belongs to a show",
+        "Snapshots preserve history",
+        "Pessimistic database locks"
+      ],
+      "segments": [
+        {
+          "text": "City, Theater, TheaterSeat, Movie, and MovieShow describe the catalog. Booking and BookingSeat retain ownership, totals, and seat-price snapshots for history.",
+          "kind": "model"
+        },
+        {
+          "text": "Payment, Refund, and Notification store outcomes. ShowSeat is the allocation authority: it keeps availability, the current booking, and the hold deadline.",
+          "source": "src/main/java/com/example/movietickets/entity/ShowSeat.java",
+          "ranges": [
+            [
+              13,
+              22
+            ]
+          ],
+          "highlights": [
+            16,
+            17,
+            18,
+            19,
+            20
+          ]
+        },
+        {
+          "text": "Repository interfaces handle persistence. ShowSeatRepository's lockOne and lockByBooking request database write locks, keeping competing updates inside transactions.",
+          "source": "src/main/java/com/example/movietickets/repository/ShowSeatRepository.java",
+          "ranges": [
+            [
+              12,
+              21
+            ]
+          ],
+          "highlights": [
+            15,
+            17,
+            19,
+            21
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Hold seats in one transaction",
+      "subtitle": "BookingService.hold",
+      "points": [
+        "Lock show + ordered seat rows",
+        "Reject active allocations",
+        "All seats succeed together"
+      ],
+      "segments": [
+        {
+          "text": "BookingService.hold checks distinct seat IDs, locks the show, and processes seats in sorted order.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              64,
+              74
+            ]
+          ],
+          "highlights": [
+            64,
+            68,
+            74
+          ]
+        },
+        {
+          "text": "Booked seats and unexpired holds are rejected, so the transaction cannot allocate the same seat twice.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              79,
+              88
+            ]
+          ],
+          "highlights": [
+            80,
+            82,
+            83,
+            84
+          ]
+        },
+        {
+          "text": "It saves the booking and seat snapshots in the same transaction. The hold ends after five minutes, or when the show starts, whichever comes first.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              98,
+              108
+            ]
+          ],
+          "highlights": [
+            98,
+            99,
+            100,
+            104,
+            105
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Calculate prices once, then snapshot them",
+      "subtitle": "PricingCalculator.seatPrice / applyDiscount",
+      "points": [
+        "Regular / premium base prices",
+        "Weekend in the city's time zone",
+        "Decimal amounts and rounding"
+      ],
+      "segments": [
+        {
+          "text": "PricingCalculator starts from the regular or premium seat price. seatPrice applies the weekend surcharge using the city's time zone and rounds to two decimal places.",
+          "source": "src/main/java/com/example/movietickets/util/PricingCalculator.java",
+          "ranges": [
+            [
+              12,
+              18
+            ]
+          ],
+          "highlights": [
+            13,
+            14,
+            15,
+            16
+          ]
+        },
+        {
+          "text": "A valid discount reduces the subtotal through applyDiscount. BookingService checks the code's active window and saves the result, so later price edits cannot change it.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              90,
+              101
+            ]
+          ],
+          "highlights": [
+            93,
+            94,
+            95,
+            100,
+            101
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Pay, confirm, and make retries safe",
+      "subtitle": "BookingService.pay \u00b7 ownedLocked",
+      "points": [
+        "Simulated payment ledger",
+        "Check owner and deadline",
+        "One successful confirmation"
+      ],
+      "segments": [
+        {
+          "text": "pay locks the customer's booking and checks its deadline and continued ownership of every seat. A failed simulated payment keeps the booking held until expiry.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              110,
+              122
+            ]
+          ],
+          "highlights": [
+            112,
+            113,
+            116,
+            119,
+            122
+          ]
+        },
+        {
+          "text": "Success records payment, freezes the refund policy, confirms the booking, marks its seats booked, and queues a notification. Repeating success returns the existing result without another payment.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              123,
+              134
+            ]
+          ],
+          "highlights": [
+            123,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Cancel and calculate the refund",
+      "subtitle": "BookingService.cancel \u00b7 RefundCalculator.amount",
+      "points": [
+        "Confirmed bookings before start",
+        "Full / partial / zero refund",
+        "Release seats atomically"
+      ],
+      "segments": [
+        {
+          "text": "cancel allows the owner to cancel a confirmed booking before the show starts. A repeated cancellation returns the existing result.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              136,
+              143
+            ]
+          ],
+          "highlights": [
+            138,
+            139,
+            140,
+            143
+          ]
+        },
+        {
+          "text": "RefundCalculator.amount applies the saved cutoffs to the amount paid. The service records a simulated refund, releases seats, and queues cancellation in one transaction.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              144,
+              152
+            ]
+          ],
+          "highlights": [
+            145,
+            146,
+            147,
+            148,
+            149,
+            150
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Expire holds automatically",
+      "subtitle": "MaintenanceJobs.expireHolds \u00b7 BookingService.expireOne",
+      "points": [
+        "Scheduled cleanup",
+        "Release only owned seats",
+        "Deadline checked on requests"
+      ],
+      "segments": [
+        {
+          "text": "MaintenanceJobs finds overdue holds and calls expireOne. That method locks the booking, marks it expired, and releases seats that still belong to it.",
+          "source": "src/main/java/com/example/movietickets/service/BookingService.java",
+          "ranges": [
+            [
+              154,
+              161
+            ]
+          ],
+          "highlights": [
+            156,
+            157,
+            158,
+            159,
+            160
+          ]
+        },
+        {
+          "text": "Availability and booking operations also check expiry directly. Therefore, a delayed cleanup job cannot extend a hold, and another customer can reclaim an expired seat.",
+          "source": "src/main/java/com/example/movietickets/service/CatalogService.java",
+          "ranges": [
+            [
+              258,
+              266
+            ]
+          ],
+          "highlights": [
+            261,
+            262,
+            263
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Deliver notifications in the background",
+      "subtitle": "NotificationService \u00b7 MaintenanceJobs",
+      "points": [
+        "Pending \u2192 delivered inbox",
+        "Reminder within one hour",
+        "Recheck cancelled bookings"
+      ],
+      "segments": [
+        {
+          "text": "Confirmation and cancellation transactions call NotificationService.enqueue to store pending messages.",
+          "source": "src/main/java/com/example/movietickets/service/NotificationService.java",
+          "ranges": [
+            [
+              34,
+              37
+            ]
+          ],
+          "highlights": [
+            35,
+            36
+          ]
+        },
+        {
+          "text": "enqueueReminders finds confirmed bookings within one hour of show time, while background jobs handle delivery.",
+          "source": "src/main/java/com/example/movietickets/service/NotificationService.java",
+          "ranges": [
+            [
+              39,
+              50
+            ]
+          ],
+          "highlights": [
+            42,
+            44,
+            45,
+            48
+          ]
+        },
+        {
+          "text": "deliverPending rechecks reminders and drops them after cancellation. inbox returns delivered records to the customer. This is a REST inbox, with no external email or SMS provider.",
+          "source": "src/main/java/com/example/movietickets/service/NotificationService.java",
+          "ranges": [
+            [
+              52,
+              66
+            ]
+          ],
+          "highlights": [
+            57,
+            58,
+            59,
+            63,
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Tests, setup, and the verification limit",
+      "subtitle": "Unit tests \u00b7 integration tests \u00b7 README",
+      "points": [
+        "17 tests passed",
+        "PostgreSQL test skipped",
+        "Configure DB environment values"
+      ],
+      "segments": [
+        {
+          "text": "The tests cover calculations, ownership, expiry, refunds, notifications, and concurrent requests. This race test starts two customers and expects exactly one seat-hold winner.",
+          "source": "src/test/java/com/example/movietickets/integration/ConcurrentHoldIntegrationTest.java",
+          "ranges": [
+            [
+              52,
+              59
+            ]
+          ],
+          "highlights": [
+            53,
+            55,
+            56,
+            57,
+            58
+          ]
+        },
+        {
+          "text": "The local suite has seventeen passing tests. The optional PostgreSQL race is unverified because no database credentials were supplied.",
+          "kind": "verification"
+        },
+        {
+          "text": "Run Maven tests, then set database variables and start the app using the README. Payments and refunds are simulated; the plan, agent instructions, and skills record document the development workflow.",
+          "source": "src/main/resources/application.yml",
+          "ranges": [
+            [
+              1,
+              16
+            ]
+          ],
+          "highlights": [
+            3,
+            4,
+            5,
+            8,
+            11,
+            13
+          ]
+        }
+      ]
+    }
+  ]
+}
